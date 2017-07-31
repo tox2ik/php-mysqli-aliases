@@ -1,0 +1,22 @@
+{
+    "name": "tox2ik/php-mysqli-aliases",
+    "description": "fetch-array, insert values, etc",
+    "type": "utility",
+    "license": "public-domain",
+    "authors": [
+        {
+            "name": "jaroslav",
+            "email": "jazzoslav@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {},
+    "autoload": {
+       "files": [
+	   "src/tox2ik-mysqli-aliases.php"
+       ],
+       "psr-4": {
+	       "Genja\\": "src/Genja"
+       }
+    }
+}
