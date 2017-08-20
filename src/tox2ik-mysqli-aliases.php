@@ -2,8 +2,14 @@
 /* Shorthands for various mysql->query(sqlstring); mysql->fetch() */
 
 if (! function_exists('db') ) {
+
+
+
     /** @return mysqli The (global) connection handler */
     function db() {
+        if (function_exists('db_override')) {
+            return db_override();
+        }
         global $db;
         return $db;
     }
