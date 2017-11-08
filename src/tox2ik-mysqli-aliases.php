@@ -5,7 +5,7 @@ if (! function_exists('db') ) {
 
 
 
-    /** @return mysqli The (global) connection handler */
+    /** @return mysqli|PDO The (global) connection handler */
     function db() {
         if (function_exists('db_override')) {
             return db_override();
@@ -15,22 +15,30 @@ if (! function_exists('db') ) {
     }
 }
 
+
 /**
- * @param string $selectQuery sql-query-string
+ * @param string|PDOStatement $selectQuery sql-query-string
  * @param int $resultType
  * @return array
  */
 function qArrayOne($selectQuery, $resultType = MYSQLI_BOTH) {
     $db = db();
-    $res = $db->query($selectQuery);
-    if ($db->errno)  {
+    $record = [];
+    if (is_a($selectQuery, 'PDOStatement')) {
+        $res = $selectQuery->fetch(_toPdoResultType($resultType));
+        $record = false === $res ? [] : $res;
+    } else {
+        $res = db()->query($selectQuery);
+        $record = false === $res ? [] : mysqli_fetch_array($res, $resultType);
+    }
+    if ($error = _qLastError())  {
         error_log(print_r([
-            'error' => __METHOD__ . ': ' . $db->error,
+            'error' => __METHOD__ . ': ' . $error,
             'query' => $selectQuery,
             'trace' => getPrettyTrace()
         ], true));
     }
-    return false === $res ? [] : mysqli_fetch_array($res, $resultType);
+    return $record;
 }
 
 /**
@@ -49,16 +57,28 @@ function qAssocOne($selectQuery) {
  */
 function qVar($selectQuery, $defaultValue = null, $resultType = MYSQLI_NUM) {
     $db = db();
+    /** @var mysqli_result|PDOStatement */
+    $count = 0;
     $res = $db->query($selectQuery);
-    if ($db->errno)  {
+    if ($error = _qLastError())  {
         error_log(print_r([
-            'error' => __METHOD__ . ': ' . $db->error,
+            'error' => __METHOD__ . ': ' . $error,
             'query' => $selectQuery,
             'trace' => getPrettyTrace()
         ], true));
     }
-    if ($res && $res->num_rows) {
-        $first = $res->fetch_array($resultType);
+
+    if ($isPdo = is_a($res, 'PDOStatement')) {
+        $count = $res->rowCount();
+    } elseif ($res) {
+        $count = $res->num_rows;
+    }
+
+    if ($res && $count) {
+         $first = $isPdo
+             ? $res->fetch(_toPdoResultType($resultType))
+             : $res->fetch_array($resultType);
+
         assert(is_array($first));
         return reset($first);
     }
@@ -161,30 +181,50 @@ function qArrayColumnAll($colName, $selectQuery, $resultType = MYSQLI_BOTH) {
     return $columns ? $columns : [];
 }
 
-/** @return mysqli_stmt */
+/** @return mysqli_stmt|PDOStatement */
 function qPrep($query) {
     $db = db();
     $stmt = $db->prepare($query);
-    if ($db->errno)  {
+    if ($error = _qLastError())  {
         error_log(print_r([
-            'error' => __METHOD__ . ': ' . $db->error,
-            'query' => 'mysqli_stmt (prepared)',
+            'error' => __METHOD__ . ': ' . $error,
+            'query' => 'prepared mysqli_stmt/PDOStatement',
             'trace' => getPrettyTrace()
         ], true));
     }
     return $stmt;
 }
 
-function qExecutePrepared(mysqli_stmt $stmt) {
-    $res = $stmt->execute();
-    if ($stmt->errno)  {
+
+/**
+ * @param $stmt mysqli_stmt|PDOStatement
+ * @param array $bindParams values for placeholders in query
+ * @return mixed
+ */
+function qExecutePrepared($stmt, $bindParams=[]) {
+    $isPdo = is_a($stmt, 'PDOStatement');
+    $res = null;
+
+    if (!$stmt) {
+        error_log(sprintf('%s: refusing to executen a non-statement', __FILE__));
+        return null;
+    }
+    if ($isPdo && $stmt) {
+        $stmt->execute($bindParams);
+    } elseif ($stmt) {
+        $res = $stmt->execute();
+    }
+
+
+    $error = _qLastError();
+    if ($error)  {
         error_log(print_r([
-            'error' => __METHOD__ . ': ' . $stmt->error,
+            'error' => __METHOD__ . ': ' . $error,
             'query' => 'mysqli_stmt (prepared)',
             'trace' => getPrettyTrace()
         ], true));
     }
-    return $res;
+    return $isPdo ? $stmt : $res;
 }
 
 /**
@@ -208,24 +248,56 @@ function qError() {
 }
 
 if (! function_exists('getPrettyTrace')) {
-	function getPrettyTrace() {
-		$trace ='';
-		$btrace = debug_backtrace(
-			DEBUG_BACKTRACE_PROVIDE_OBJECT |
-			DEBUG_BACKTRACE_IGNORE_ARGS );
+    function getPrettyTrace() {
+        $trace ='';
+        $btrace = debug_backtrace(
+            DEBUG_BACKTRACE_PROVIDE_OBJECT |
+            DEBUG_BACKTRACE_IGNORE_ARGS );
 
-		foreach ($btrace as $element) {
-			if ( !isset($element['file'] ))
-				$element['file'] = '*nofile*';
+        foreach ($btrace as $element) {
+            if ( !isset($element['file'] ))
+                $element['file'] = '*nofile*';
 
-			if ( !isset($element['line'] ))
-				$element['line'] = -1;
+            if ( !isset($element['line'] ))
+                $element['line'] = -1;
 
-			$trace .= sprintf("%20s/%20s %4d %20s()\n",
-				dirname( basename( $element['file'])),
-				basename( $element['file']) ,
-				$element['line'], $element['function']);
-		}
-		return $trace;
-	}
+            $trace .= sprintf("%20s/%20s %4d %20s()\n",
+                dirname( basename( $element['file'])),
+                basename( $element['file']) ,
+                $element['line'], $element['function']);
+        }
+        return $trace;
+    }
+}
+
+
+/**
+ * @param $mysqliConstant int MYSQLI_{BOTH,NUM,ASSOC}
+ * @return mixed
+ */
+function _toPdoResultType($mysqliConstant) {
+    $mi2pdo = [
+        MYSQLI_NUM => PDO::FETCH_NUM,
+        MYSQLI_ASSOC => PDO::FETCH_ASSOC,
+        MYSQLI_BOTH => PDO::FETCH_BOTH
+    ];
+    return $mi2pdo[$mysqliConstant];
+}
+
+/**
+ * Formatting of the error is subject to change.
+ * @return string error message from the db-driver.
+ */
+function _qLastError() {
+
+    $db = db();
+    if (is_a($db, 'PDO')) {
+        if ($db->errorCode() === '00000') {
+            return null;
+        }
+        $err = db()->errorInfo();
+        $error =  array_filter($err);
+        return empty($error) ? null : join(' : ', db()->errorInfo());
+    }
+    return db()->errno ? db()->error : null;
 }
