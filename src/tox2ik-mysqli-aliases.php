@@ -129,8 +129,12 @@ function qAssocAll($selectQuery) {
 function qInsert($insertQuery) {
     $db = db();
     $db->query($insertQuery);
-    if ($db->error) {
-        error_log($db->error);
+    if ($db->errno)  {
+        error_log(print_r([
+            'error' => __METHOD__ . ': ' . $db->error,
+            'query' => $insertQuery,
+            'trace' => getPrettyTrace()
+        ], true));
         return 0;
     }
     return $db->insert_id;
