@@ -135,7 +135,6 @@ function qAssocAll($selectQuery) {
 function qInsert($insertQuery) {
     $db = db();
     $db->query($insertQuery);
-
     if ($error = _qLastError())  {
         error_log(print_r([
             'error' => __METHOD__ . ': ' . $error,
@@ -144,7 +143,6 @@ function qInsert($insertQuery) {
         ], true));
         return 0;
     }
-
     return is_a($db, 'PDO') ? $db->lastInsertId() : $db->insert_id;
 }
 
