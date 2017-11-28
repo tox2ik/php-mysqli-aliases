@@ -1,6 +1,8 @@
 <?php
 /* Shorthands for various mysql->query(sqlstring); mysql->fetch() */
 
+
+
 if (! function_exists('db') ) {
 
 
@@ -287,10 +289,13 @@ if (! function_exists('getPrettyTrace')) {
  * @return mixed
  */
 function _toPdoResultType($mysqliConstant) {
+    $num = defined('MYSQLI_NUM') ? MYSQLI_NUM : 1;
+    $assoc = defined('MYSQLI_ASSOC') ? MYSQLI_ASSOC : 1;
+    $both = defined('MYSQLI_BOTH') ? MYSQLI_BOTH : 1;
     $mi2pdo = [
-        MYSQLI_NUM => PDO::FETCH_NUM,
-        MYSQLI_ASSOC => PDO::FETCH_ASSOC,
-        MYSQLI_BOTH => PDO::FETCH_BOTH
+        /* MYSQLI_NUM   */ 1 => PDO::FETCH_NUM,
+        /* MYSQLI_ASSOC */ 2 => PDO::FETCH_ASSOC,
+        /* MYSQLI_BOTH  */ 3 => PDO::FETCH_BOTH
     ];
     return $mi2pdo[$mysqliConstant];
 }
