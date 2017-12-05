@@ -1,9 +1,28 @@
 <?php
-/* Shorthands for various mysql->query(sqlstring); mysql->fetch() */
+
+/*
+ *
+ * Shorthands for various mysql->query(sqlstring); mysql->fetch()
+ *
+ * so instead of e.g. (wow such database many relation);
+ *
+ *    sql = select garbage from dumpster
+ *    result = mysqli_query(sql)
+ *    while (trash = mysqli_fetch_assoc(result))
+ *        crap[] = trash
+ *
+ * we do:
+ *
+ *    crap = qAssocAll(sql)
+ *
+ */
+
+if (! defined('MYSQLI_ASSOC')) { define('MYSQLI_ASSOC', 1); }
+if (! defined('MYSQLI_NUM')) { define('MYSQLI_NUM', 2); }
+if (! defined('MYSQLI_BOTH')) { define('MYSQLI_BOTH', 3); }
+
 
 if (! function_exists('db') ) {
-
-
 
     /** @return mysqli|PDO The (global) connection handler */
     function db() {
