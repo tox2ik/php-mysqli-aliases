@@ -29,6 +29,10 @@ function qArrayOne($selectQuery, $resultType = MYSQLI_BOTH) {
         $record = false === $res ? [] : $res;
     } else {
         $res = db()->query($selectQuery);
+        if (is_a($res, 'PDOStatement')) {
+            return qArrayOne($res, $resultType);
+        }
+
         $record = false === $res ? [] : mysqli_fetch_array($res, $resultType);
     }
     if ($error = _qLastError())  {
