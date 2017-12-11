@@ -15,6 +15,10 @@
  *
  *    crap = qAssocAll(sql)
  *
+ *
+ * These functions are most useful to me when working with old projects
+ * where the queries are written without any active record or ORM abstractions.
+ *
  */
 
 if (! defined('MYSQLI_ASSOC')) { define('MYSQLI_ASSOC', 1); }
@@ -271,9 +275,36 @@ function qExists($query) {
     return $res and $res->num_rows > 0;
 }
 
-function qEscape($query) {
+/**
+ *
+ * I usually write the queries in way that makes it fairly obvious that the user input will not cause an sql-injection.
+ *
+ *     qInsert(sprintf("insert into table foo (user_id, key, value) values ('%d', '%s', '%s'))",
+ *         $uid,
+ *         qEscape($userInputKey),
+ *         qEscape($userInputValue)
+ *     ));
+ *
+ * For this reason, the surrounding quotes for the PDO->quote() variant are redundant.
+ * Please be adviced that this default behavior may lead to suble bugs.
+ * @param string $value unsafe string from user
+ * @param bool $trimquotes remove the single quotes around the escaped value when using pdo
+ * @param int $pdoParameterType
+ * @return string
+ */
+function qEscape($value, $trimquotes = true, $pdoParameterType = \PDO::PARAM_STR) {
     $db = db();
-    return $db->real_escape_string($query);
+    /*
+     * if working with pdo,
+     *     then if value is a string, then remove the single quotes, but only if trim-quotes is true.
+     *     otherwise just return whatever pdo->quote returns
+     * and if not pdo, then run mysqli_real_escape_string
+     */
+    return is_a($db, 'PDO')
+        ? (\PDO::PARAM_STR === $pdoParameterType
+            ? trim($db->quote($value, $pdoParameterType), $trimquotes ? "'" : null)
+            : $db->quote($value, $pdoParameterType))
+        : $db->real_escape_string($value);
 }
 
 function qError() {
