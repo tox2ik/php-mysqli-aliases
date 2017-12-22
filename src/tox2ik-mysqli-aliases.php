@@ -143,7 +143,7 @@ function qArrayAll($selectQuery, $resultType = MYSQLI_BOTH) {
         ], true));
     }
 
-    $rows = is_a($result, PDOStatement::class)
+    $rows = is_a($result, 'PDOStatement')
         ? $result->fetchAll(_toPdoResultType($resultType))
         : mysqli_fetch_all($result, $resultType);
     return $rows ? $rows : [];
