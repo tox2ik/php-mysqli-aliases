@@ -265,6 +265,38 @@ function qExecutePrepared($stmt, $bindParams=[]) {
     return $isPdo ? $stmt : $res;
 }
 
+function qBind($stmt, $params, $paramTypes=null) {
+    $isPdo = is_a($stmt, 'PDOStatement');
+    if ($isPdo) {
+        /** @var PDOStatement $stmt */
+        if ($paramTypes === null) {
+            $stmt->execute($params);
+        } else {
+            throw new RuntimeException('qBind(pdostatment, values, types): the types is assumed to be null. ie. implement me.');
+        }
+
+    } else {
+        /** @var mysqli_stmt $stmt */
+        if (empty($paramTypes)) {
+            $paramTypes = '';
+            foreach ($params as $e) {
+                // Integer, Double, String, Blob
+                if (is_numeric($e)) { $paramTypes .= 'd'; }
+                else { $paramTypes .= 's'; }
+            }
+        }
+        // holy moly
+        // https://stackoverflow.com/questions/16120822/mysqli-bind-param-expected-to-be-a-reference-value-given
+        $bindMustHaveReferences = [];
+        foreach ($params as $i => $e) {
+            $bindMustHaveReferences[$i] = & $e;
+        }
+        array_unshift($bindMustHaveReferences, $paramTypes);
+        call_user_func_array([ $stmt, 'bind_param'], $bindMustHaveReferences);
+    }
+ }
+
+
 /**
  * @param string $query select statement (with several conditions)
  * @return bool true if the query matches one or more rows.
