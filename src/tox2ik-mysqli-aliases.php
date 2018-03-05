@@ -28,8 +28,14 @@ if (! defined('MYSQLI_BOTH')) { define('MYSQLI_BOTH', 3); }
 
 if (! function_exists('db') ) {
 
-    /** @return mysqli|PDO The (global) connection handler */
-    function db() {
+    /**
+     * @param \PDO|mysqli $dbi operate on this db-instance from now on
+     * @return mysqli|PDO The (global) connection handler
+     */
+    function db($dbi = null) {
+        static $sdb;
+        if ($sdb) { return $sdb; }
+        if ($dbi) { $sdb = $dbi; return $sdb; }
         if (function_exists('db_override')) {
             return db_override();
         }
@@ -265,6 +271,25 @@ function qExecutePrepared($stmt, $bindParams=[]) {
     return $isPdo ? $stmt : $res;
 }
 
+function qPrepFetch($query, $params = [], $resultType = MYSQLI_ASSOC) {
+    // error_log(sprintf('%s:%d %s', __FILE__, __LINE__, _qPreparedToString($query, $params)));
+    $stmt = qPrep($query);
+    try {
+        qExecutePrepared($stmt, $params);
+    } catch (\Exception $ex) {
+        error_log($ex->getMessage());
+        throw $ex;
+    }
+    $rows = is_a($stmt, 'PDOStatement')
+        ? $stmt->fetchAll(_toPdoResultType($resultType))
+        : mysqli_fetch_all($stmt, $resultType); // todo: fixme / test me
+    return $rows ? $rows : [];
+}
+
+function qPlaceHolders($length) {
+    return join(', ',  array_fill(0, is_array($length) ? count($length) : $length, '?'));
+}
+
 function qBind($stmt, $params, $paramTypes=null) {
     $isPdo = is_a($stmt, 'PDOStatement');
     if ($isPdo) {
@@ -386,6 +411,7 @@ function _toPdoResultType($mysqliConstant) {
     return $mi2pdo[$mysqliConstant];
 }
 
+
 /**
  * Formatting of the error is subject to change.
  * @return string error message from the db-driver.
@@ -405,3 +431,16 @@ function _qLastError() {
     }
     return $error;
 }
+
+
+function _qPreparedToString($query, $parameters) {
+    if (! empty($parameters)) {
+        foreach($parameters as $key => $value) {
+            preg_match('/(\?(?!=))/i', $query, $match, PREG_OFFSET_CAPTURE);
+            $query = substr_replace($query, $value, $match[0][1], 1);
+        }
+    }
+    return $query;
+
+}
+

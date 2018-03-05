@@ -22,26 +22,39 @@ This is acceptable:
 
 ## Helpers
 
+### Arbitrary queries
+
+    qInsert()                - get the last inserted id after inserting
+    qResult()                - query and get a result set
+    qUpdate()                - get the number of affected rows
+
+    qPrep()                  - prepare a statement
+    qExecutePrepared()       - yep
+
+### Select queries
+
     qArrayAll()              - get array (hydrate: both)
     qAssocAll()              - get array (hydrate: associative)
-    qArrayColumnAll()        - get all values of a single column
+    qArrayColumnAll()        - get a column from several rows
+    qPrepFetch()             - prepare, execute and fetch
+
+    qVar()                   - get a single value
     qArrayOne()              - get a single record
     qAssocOne()              - get a single record (assoc)
     qOne()                   - get a single record (assoc)
-    qEscape()                - escape ' and "
+
     qExists()                - get a true boolean if a query produces results
-    qInsert()                - get the last inserted id after inserting
-    qInsertId()              - get the last inserted id without inserting anything
-    qLastId()                - get the last inserted id without inserting anything
-    qResult()                - query and get a result set
-    qPrep()                  - prepare a statement
-    qExecutePrepared()       - yep
-    qUpdate()                - get the number of affected rows    
-    qVar()                   - get a single value
+
+### Meta queries
+
+    qLastId()                - get the last inserted id
+    qInsertId()              - get the last inserted id
     qError()                 - get last error
+    qEscape()                - escape ' and "
+    qPlaceHolders()          - print placeholders for prepared statement ?, ?, ?
+
 
 ## Features
-
 
 - reduces boilerplate
 - supports mysqli and PDO with the same *interface*
