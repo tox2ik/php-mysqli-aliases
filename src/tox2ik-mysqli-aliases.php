@@ -34,7 +34,7 @@ if (! function_exists('db') ) {
      */
     function db($dbi = null) {
         static $sdb;
-        if ($dbi) { $sdb = $dbi; return $sdb; }
+        if ($dbi) { $sdb = $dbi; }
         if ($sdb) { return $sdb; }
         if (function_exists('db_override')) {
             return db_override();
