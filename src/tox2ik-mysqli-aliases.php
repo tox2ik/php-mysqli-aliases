@@ -29,13 +29,15 @@ if (! defined('MYSQLI_BOTH')) { define('MYSQLI_BOTH', 3); }
 if (! function_exists('db') ) {
 
     /**
-     * @param \PDO|mysqli $dbi operate on this db-instance from now on
+     * This is supposed to be mockable and to be used with global db handlers.
+     *
+     * @param null $pdo works as a setter(e.g. from a test)
      * @return mysqli|PDO The (global) connection handler
      */
-    function db($dbi = null) {
-        static $sdb;
-        if ($dbi) { $sdb = $dbi; }
-        if ($sdb) { return $sdb; }
+    function db($pdo = null) {
+        static $_pdo;
+        if ($pdo) { $_pdo = $pdo; }
+        if ($_pdo) { return $_pdo; }
         if (function_exists('db_override')) {
             return db_override();
         }
@@ -93,6 +95,11 @@ function qVar($selectQuery, $defaultValue = null, $resultType = MYSQLI_NUM) {
     /** @var mysqli_result|PDOStatement */
     $count = 0;
     $res = $db->query($selectQuery);
+
+    $file = basename($_SERVER['SCRIPT_FILENAME']);
+    file_put_contents("/tmp/qlog.$file", "$selectQuery\n", FILE_APPEND);
+    @chmod("/tmp/qlog.$file", 0666);
+
     if ($error = _qLastError())  {
         error_log(print_r([
             'error' => __METHOD__ . ': ' . $error,
@@ -139,6 +146,11 @@ function qArrayAll($selectQuery, $resultType = MYSQLI_BOTH) {
     $db = db();
 
     /** @var PDOStatement|mysqli_result $result */
+
+
+    $file = basename($_SERVER['SCRIPT_FILENAME']);
+    file_put_contents("/tmp/qlog.$file", "$selectQuery\n", FILE_APPEND);
+    chmod("/tmp/qlog.$file", 0666);
 
     $result = $db->query($selectQuery);
     if ($error = _qLastError())  {
@@ -194,7 +206,7 @@ function qUpdate($query) {
     return is_a($db, 'PDO') ? $res->rowCount() : $db->affected_rows;;
 }
 
-/** @return false|mysqli_result */
+/** @return false|mysqli_result|PDOStatement */
 function qResult($query) {
     $db = db();
     $res = $db->query($query);
@@ -254,13 +266,13 @@ function qExecutePrepared($stmt, $bindParams=[]) {
         return null;
     }
     if ($isPdo && $stmt) {
-        $stmt->execute($bindParams);
+        $res = $stmt->execute($bindParams);
     } elseif ($stmt) {
         $res = $stmt->execute();
     }
 
 
-    $error = _qLastError();
+    $error = _qLastError($stmt);
     if ($error)  {
         error_log(print_r([
             'error' => __METHOD__ . ': ' . $error,
@@ -411,15 +423,23 @@ function _toPdoResultType($mysqliConstant) {
     return $mi2pdo[$mysqliConstant];
 }
 
-
 /**
  * Formatting of the error is subject to change.
  * @return string error message from the db-driver.
  */
-function _qLastError() {
+function _qLastError($stmt = null) {
 
     $db = db();
-    if (is_a($db, 'PDO')) {
+    if ($stmt) {
+        if ($stmt->errorCode() === '00000') {
+            return null;
+        }
+
+        $err = $stmt->errorInfo();
+        $error =  array_filter($err);
+        $error = empty($error) ? null : join(' : ', $error);
+
+    } elseif (is_a($db, 'PDO')) {
         if ($db->errorCode() === '00000') {
             return null;
         }
